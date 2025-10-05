@@ -20,6 +20,8 @@ tokio = { workspace = true, features = [
     "rt-multi-thread",
     "net",
     "signal",
+    "time",
+    "sync",
 ] }
 clap = { workspace = true, features = ["derive"] }
 [build-dependencies]

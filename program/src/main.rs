@@ -1,6 +1,18 @@
-use anyhow::Context as _;
-use aya::programs::{Xdp, XdpFlags};
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
+
+use anyhow::Context;
+use aya::{
+    maps::Array,
+    programs::{Xdp, XdpFlags},
+};
 use clap::Parser;
+use log::info;
 #[rustfmt::skip]
 use log::{debug, warn};
 use tokio::signal;
@@ -25,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
     };
     let ret = unsafe { libc::setrlimit(libc::RLIMIT_MEMLOCK, &rlim) };
     if ret != 0 {
-        debug!("remove limit on locked memory failed, ret is: {ret}");
+        debug!("http_rater: remove limit on locked memory failed, ret is: {ret}");
     }
 
     // This will include your eBPF object file as raw bytes at compile-time and load it at
@@ -39,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
     match aya_log::EbpfLogger::init(&mut ebpf) {
         Err(e) => {
             // This can happen if you remove all log statements from your eBPF program.
-            warn!("failed to initialize eBPF logger: {e}");
+            warn!("http_rater: failed to initialize eBPF logger: {e}");
         }
         Ok(logger) => {
             let mut logger =
@@ -57,12 +69,31 @@ async fn main() -> anyhow::Result<()> {
     let program: &mut Xdp = ebpf.program_mut("program").unwrap().try_into()?;
     program.load()?;
     program.attach(&iface, XdpFlags::default())
-        .context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?;
+        .context("http_rater: failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?;
+
+    let map_mut = ebpf.map_mut("HTTP_PACKET_COUNTER").unwrap();
+    let counters: Array<_, u64> = Array::try_from(map_mut)?;
 
     let ctrl_c = signal::ctrl_c();
-    println!("Waiting for Ctrl-C...");
-    ctrl_c.await?;
-    println!("Exiting...");
+    let running = Arc::new(AtomicBool::new(true));
+    tokio::spawn({
+        let running = running.clone();
+        async move {
+            info!("http_rater: waiting for ctrl-c");
+            ctrl_c.await.unwrap();
+            running.store(false, Ordering::SeqCst);
+            info!("http_rater: waiting for ctrl-c");
+        }
+    });
+
+    let mut prev_read = 0;
+    let mut interval = tokio::time::interval(Duration::from_secs(1));
+    while running.load(Ordering::SeqCst) {
+        let count = counters.get(&0, 0)?;
+        info!("http_rater: reading {}", count - prev_read);
+        prev_read = count;
+        interval.tick().await;
+    }
 
     Ok(())
 }
