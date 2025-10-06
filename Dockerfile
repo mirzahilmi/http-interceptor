@@ -45,5 +45,4 @@ LABEL org.opencontainers.image.description="🐝 HTTP packet rate counter w/ eBP
 LABEL org.opencontainers.image.licenses="AGPL-3.0"
 
 COPY --from=build /artifact/target/release/program /program
-ENV RUST_LOG=debug
 CMD ["/program"]
