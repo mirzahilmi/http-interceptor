@@ -26,8 +26,17 @@ clap = { version = "4.5.20", default-features = false, features = ["std"] }
 env_logger = { version = "0.11.5", default-features = false }
 libc = { version = "0.2.159", default-features = false }
 log = { version = "0.4.22", default-features = false }
-tokio = { version = "1.40.0", default-features = false }
+tokio = { version = "1.40.0", features = [
+    "macros",
+    "rt",
+    "rt-multi-thread",
+    "net",
+    "signal",
+    "time",
+    "sync",
+] }
 which = { version = "6.0.0", default-features = false }
+network-types = { version = "0.1.0" }
 
 [profile.release.package.program-ebpf]
 debug = 2

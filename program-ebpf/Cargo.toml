@@ -8,7 +8,7 @@ program-common = { path = "../program-common" }
 
 aya-ebpf = { workspace = true }
 aya-log-ebpf = { workspace = true }
-network-types = "0.1.0"
+network-types = { workspace = true }
 
 [build-dependencies]
 which = { workspace = true }
