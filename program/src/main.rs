@@ -1,10 +1,4 @@
-use std::{
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-    time::Duration,
-};
+use std::env;
 
 use anyhow::Context;
 use aya::{
@@ -12,9 +6,12 @@ use aya::{
     programs::{Xdp, XdpFlags},
 };
 use clap::Parser;
-use log::info;
+use log::{error, info};
 #[rustfmt::skip]
 use log::{debug, warn};
+use opentelemetry::{KeyValue, global};
+use opentelemetry_otlp::{MetricExporter, WithExportConfig};
+use opentelemetry_sdk::{Resource, metrics::SdkMeterProvider};
 use tokio::signal;
 
 #[derive(Debug, Parser)]
@@ -71,29 +68,51 @@ async fn main() -> anyhow::Result<()> {
     program.attach(&iface, XdpFlags::default())
         .context("http_rater: failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?;
 
-    let map_mut = ebpf.map_mut("HTTP_PACKET_COUNTER").unwrap();
-    let counters: Array<_, u64> = Array::try_from(map_mut)?;
+    let otelcol_url = env::var("OTELCOL_URL").expect("http_rater: error: OTELCOL_URL not supplied");
+    let node_name = env::var("NODE_NAME").expect("http_rater: error: NODE_NAME not supplied");
+
+    let exporter = MetricExporter::builder()
+        .with_tonic()
+        .with_endpoint(otelcol_url)
+        .build()?;
+    let provider = SdkMeterProvider::builder()
+        .with_periodic_exporter(exporter)
+        .with_resource(Resource::builder().with_service_name("http_rater").build())
+        .build();
+    global::set_meter_provider(provider);
+
+    let meter = global::meter("http_rater");
+    meter
+        .f64_observable_counter("http_packet")
+        .with_description("Observable counter of incoming http packets")
+        .with_callback(move |observe| {
+            // i cannot come up any better for now, fix this thing dude
+            let Some(map) = ebpf.map("HTTP_PACKET_COUNTER") else {
+                warn!("http_rater: cannot find HTTP_PACKET_COUNTER map");
+                return;
+            };
+            let counters = match Array::<_, u64>::try_from(map) {
+                Ok(it) => it,
+                Err(e) => {
+                    error!("http_rater: error: {e}");
+                    return;
+                }
+            };
+
+            let Ok(count) = counters.get(&0, 0) else {
+                return;
+            };
+            observe.observe(
+                count as f64,
+                &[KeyValue::new("node_name", node_name.clone())],
+            );
+        })
+        .build();
 
     let ctrl_c = signal::ctrl_c();
-    let running = Arc::new(AtomicBool::new(true));
-    tokio::spawn({
-        let running = running.clone();
-        async move {
-            info!("http_rater: waiting for ctrl-c");
-            ctrl_c.await.unwrap();
-            running.store(false, Ordering::SeqCst);
-            info!("http_rater: waiting for ctrl-c");
-        }
-    });
-
-    let mut prev_read = 0;
-    let mut interval = tokio::time::interval(Duration::from_secs(1));
-    while running.load(Ordering::SeqCst) {
-        let count = counters.get(&0, 0)?;
-        info!("http_rater: reading {}", count - prev_read);
-        prev_read = count;
-        interval.tick().await;
-    }
+    info!("http_rater: waiting for ctrl-c");
+    ctrl_c.await?;
+    info!("http_rater: shutting down");
 
     Ok(())
 }

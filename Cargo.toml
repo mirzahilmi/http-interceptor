@@ -37,6 +37,9 @@ tokio = { version = "1.40.0", features = [
 ] }
 which = { version = "6.0.0", default-features = false }
 network-types = { version = "0.1.0" }
+opentelemetry = { version = "0.28.0" }
+opentelemetry_sdk = { version = "0.28.0" }
+opentelemetry-otlp = { version = "0.28.0", features = ["grpc-tonic"] }
 
 [profile.release.package.program-ebpf]
 debug = 2
