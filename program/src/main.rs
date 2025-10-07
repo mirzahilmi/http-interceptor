@@ -6,9 +6,9 @@ use aya::{
     programs::{Xdp, XdpFlags},
 };
 use clap::Parser;
-use log::{error, info};
+use tracing::{error, info};
 #[rustfmt::skip]
-use log::{debug, warn};
+use tracing::{debug, warn};
 use opentelemetry::{KeyValue, global};
 use opentelemetry_otlp::{MetricExporter, WithExportConfig};
 use opentelemetry_sdk::{Resource, metrics::SdkMeterProvider};
@@ -24,7 +24,7 @@ struct Opt {
 async fn main() -> anyhow::Result<()> {
     let opt = Opt::parse();
 
-    env_logger::init();
+    tracing_subscriber::fmt::init();
 
     // Bump the memlock rlimit. This is needed for older kernels that don't use the
     // new memcg based accounting, see https://lwn.net/Articles/837122/

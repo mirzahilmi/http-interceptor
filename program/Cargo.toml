@@ -11,14 +11,15 @@ program-common = { path = "../program-common", features = ["user"] }
 anyhow = { workspace = true, default-features = true }
 aya = { workspace = true }
 aya-log = { workspace = true }
-env_logger = { workspace = true }
 libc = { workspace = true }
-log = { workspace = true }
 tokio = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 opentelemetry = { workspace = true }
 opentelemetry_sdk = { workspace = true }
 opentelemetry-otlp = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
 [build-dependencies]
 anyhow = { workspace = true }
 aya-build = { workspace = true }

@@ -23,9 +23,7 @@ anyhow = { version = "1", default-features = false }
 #
 # See https://github.com/clap-rs/clap/blob/61f5ee5/clap_builder/src/lib.rs#L15.
 clap = { version = "4.5.20", default-features = false, features = ["std"] }
-env_logger = { version = "0.11.5", default-features = false }
 libc = { version = "0.2.159", default-features = false }
-log = { version = "0.4.22", default-features = false }
 tokio = { version = "1.40.0", features = [
     "macros",
     "rt",
@@ -40,6 +38,8 @@ network-types = { version = "0.1.0" }
 opentelemetry = { version = "0.28.0" }
 opentelemetry_sdk = { version = "0.28.0" }
 opentelemetry-otlp = { version = "0.28.0", features = ["grpc-tonic"] }
+tracing = { version = "0.1.41" }
+tracing-subscriber = { version = "0.3" }
 
 [profile.release.package.program-ebpf]
 debug = 2
